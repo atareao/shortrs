@@ -12,7 +12,7 @@ use axum::{
 };
 use tracing::{info, debug};
 use tera::{Tera, Context};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 use crate::model::{url::Url, radix::{from_d36, to_d36}, parameters::Parameters, response::Response};
 
@@ -27,9 +27,9 @@ pub fn router() -> Router{
     //.route("/",
     //    get(get_shorturl)
     //)
-    //.route("/",
-    //    post(post_shorturl)
-    //)
+    .route("/",
+        post(post_shorturl)
+    )
     .route("/result",
         post(result)
     )
@@ -40,16 +40,19 @@ pub fn router() -> Router{
 
 #[derive(Deserialize)]
 struct NewUrl{
-    url: String,
+    src: String,
 }
 
-//async fn post_shorturl(
-//    ctx: Extension<ApiContext>,
-//    t: Extension<Tera>,
-//    Json(payload): Json<NewUrl>
-//) -> impl IntoResponse{
-//
-//}
+
+async fn post_shorturl(
+    ctx: Extension<ApiContext>,
+    t: Extension<Tera>,
+    Json(payload): Json<NewUrl>
+) -> impl IntoResponse{
+    let src = payload.src;
+    let url = Url::update_or_create(&ctx.pool, &src).await.unwrap();
+    Json(url.get_short())
+}
 
 async fn redirect(
     ctx: Extension<ApiContext>,
