@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Index{% endblock title %}
+{% block head %}
+    {{ super() }}
+    <style type="text/css">
+        .important { color: #336699; }
+    </style>
+{% endblock head %}
+{% block content %}
+        <input id="src" type="text" placeholder="Enter your link"/>
+        <button id="submit">Shortme</button>
+    </form>
+    <div>
+        <h3 id="error"></h3>
+    </div>
+    <div id="result" style="display: none;">
+        <a id="url" href=""></a><span id="clip">📋</span>
+        <span id="copy-status">Click to copy</span>
+    </div>
+<script>
+function validURL(str) {
+  const pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
+    '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+    '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+  return !!pattern.test(str);
+}
+const input = document.getElementById("src");
+const result_div = document.getElementById("result");
+const button = document.getElementById('submit');
+const url = document.getElementById("url");
+const clip = document.getElementById("clip");
+input.addEventListener('input', function (evt) {
+    input.setAttribute("aria-invalid", !validURL(input.value));
+});
+clip.addEventListener("click", function(event){
+    if (!navigator.clipboard) {
+        // Clipboard API not available
+        return;
+    }
+    try {
+        navigator.clipboard.writeText(url.innerText);
+        document.getElementById('copy-status').innerText = 'Copied to clipboard';
+        setTimeout(function () {
+            document.getElementById('copy-status').innerText = 'Click to copy';
+        }, 1200);
+    } catch (err) {
+      console.error('Failed to copy!', err);
+    }
+},
+false);
+button.onclick = function(event){
+    const src = input.value;
+    const messageError = document.getElementById("error");
+    if(!validURL(src)){
+        console.log("Url not valid");
+        input.setAttribute("aria-invalid", "true");
+        url.innerHTML = `This url '${src}' is not valid url`;
+        return;
+    }else{
+        input.setAttribute("aria-invalid", "false");
+    }
+    //open the request
+    fetch("/", {
+        method: "post",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({src: src}),
+    })
+    .then((response) => response.json())
+    .then((result) => {
+        console.log("Success", result);
+        const ref = window.location.href + result.short;
+        url.href = `/${result.short}`;
+        url.innerText = ref;
+        result_div.style.display = "block";
+    })
+    .catch((error) => {
+        console.log("Error", error);
+        result_div.style.display = "none";
+    });
+    return false;
+}
+</script>
+{% endblock content %}
