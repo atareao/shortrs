@@ -16,9 +16,23 @@ pub struct Url{
     updated_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ShortUrl{
+    src: String,
+    short: String,
+    num: u32,
+}
+
 impl Url{
     pub fn get_src(&self) -> &str{
         &self.src
+    }
+    pub fn get_short(&self) -> ShortUrl{
+        ShortUrl {
+            src: self.src.to_string(),
+            short: self.get_url(),
+            num: self.num,
+        }
     }
     pub fn get_id(&self) -> i64{
         self.id
@@ -40,7 +54,7 @@ impl Url{
             updated_at,
         }
     }
-    pub fn get_url(self) -> String{
+    pub fn get_url(&self) -> String{
         let value: u32 = self.id.try_into().unwrap();
         to_d36(value)
     }
