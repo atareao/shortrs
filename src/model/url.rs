@@ -189,29 +189,20 @@ mod url_test {
             MigrateDatabase
         }
     };
-    use tracing_subscriber::EnvFilter;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-    use std::{env, path::Path, str::FromStr};
-    use tracing::{info, debug};
+    use std::{env, path::Path};
     use super::Url;
 
-    const DB_URL: &'static str = "sqlite:test.db";
-
-    async fn setup() -> Pool<Sqlite>{
-        tracing_subscriber::registry()
-            .with(EnvFilter::from_str("debug").unwrap())
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-        teardown().await;
-        if !sqlx::Sqlite::database_exists(DB_URL).await.unwrap(){
-            sqlx::Sqlite::create_database(DB_URL).await.unwrap();
+    async fn setup(db: &str) -> Pool<Sqlite>{
+        let db_url = format!("sqlite:{}", db);
+        teardown(db).await;
+        if !sqlx::Sqlite::database_exists(&db_url).await.unwrap(){
+            sqlx::Sqlite::create_database(&db_url).await.unwrap();
         }
         let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let migrations = Path::new(&crate_dir).join("./migrations");
-        info!("{}", &migrations.display());
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
-            .connect(DB_URL)
+            .connect(&db_url)
             .await
             .expect("Pool failed");
 
@@ -225,38 +216,68 @@ mod url_test {
     }
 
     #[allow(unused_must_use)]
-    async fn teardown() {
-        tokio::fs::remove_file("test.db").await;
-        tokio::fs::remove_file("test.db-shm").await;
-        tokio::fs::remove_file("test.db-wal").await;
+    async fn teardown(db: &str) {
+        tokio::fs::remove_file(db).await;
+        tokio::fs::remove_file(format!("{}-shm", db)).await;
+        tokio::fs::remove_file(format!("{}-wal", db)).await;
     }
 
     #[tokio::test]
     async fn test_create(){
+        let db = "test-create.db";
         // Start and prepare
-        let pool = setup().await;
+        let pool = setup(db).await;
         // Test
-        let src = "https://atareao.es";
+        let src = "https://google.es";
         let url = Url::create(&pool, src).await.unwrap();
         assert!(url.get_src() == src);
         assert!(url.get_num() == 0);
         // End and Clean
-        teardown().await;
+        teardown(db).await;
     }
+
     #[tokio::test]
     async fn test_increase(){
+        let db = "test-increase.db";
         // Start and prepare
-        let pool = setup().await;
+        let pool = setup(db).await;
         // Test
         let src = "https://atareao.es";
         let url = Url::create(&pool, src).await.unwrap();
-        debug!("Url created: {:?}", url);
         let new_url = Url::increase(&pool, &url).await.unwrap();
-        debug!("Url updated: {:?}", new_url);
         assert!(new_url.get_src() == src);
         assert!(new_url.get_num() == 1);
         // End and Clean
-        teardown().await;
+        teardown(db).await;
+    }
+
+    #[tokio::test]
+    async fn test_read_from_url(){
+        let db = "test-read-from-url.db";
+        // Start and prepare
+        let pool = setup(db).await;
+        // Test
+        let src = "https://atareao.es";
+        let url = Url::create(&pool, src).await.unwrap();
+        let read_url = Url::read_from_url(&pool, src).await.unwrap();
+        assert!(read_url.get_src() == url.get_src());
+        assert!(read_url.get_num() == url.get_num());
+        // End and Clean
+        teardown(db).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete(){
+        let db = "test-delete.db";
+        // Start and prepare
+        let pool = setup(db).await;
+        // Test
+        let src = "https://atareao.es";
+        let url = Url::create(&pool, src).await.unwrap();
+        let _result = Url::delete(&pool, url.id).await;
+        assert!(Url::exists(&pool, url.id).await == false);
+        // End and Clean
+        teardown(db).await;
     }
 }
 
