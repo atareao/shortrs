@@ -1,0 +1,7 @@
+url: localhost
+log_level: debug
+db_url: sqlite:urls.db
+port: 8081
+username: usuario
+password: conraseña
+per_page: 25
