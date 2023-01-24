@@ -100,11 +100,10 @@ impl Url{
             .await
     }
 
-    pub async fn update_or_create(pool: &SqlitePool, src: &str) -> Result<Self, sqlx::Error>{
-        info!("Url update_or_create");
+    pub async fn read_or_create(pool: &SqlitePool, src: &str) -> Result<Self, sqlx::Error>{
+        info!("Url read_or_create");
         match Self::read_from_url(pool, src).await{
             Ok(url) => {
-                let url = Self::increase(pool, &url).await.unwrap();
                 Ok(url)
             },
             Err(e) => {
