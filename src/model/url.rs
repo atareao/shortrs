@@ -47,7 +47,7 @@ impl Url{
 
     fn from_row(row: SqliteRow) -> Self{
         Self{
-            id: row.get("url_id"),
+            id: row.get("id"),
             src: row.get("src"),
             num: row.get("num"),
             active: row.get("active"),
@@ -57,6 +57,7 @@ impl Url{
     }
 
     pub async fn create(pool: &SqlitePool, src: &str) -> Result<Self, sqlx::Error>{
+        info!("Url create");
         let num = 0;
         let active = true;
         let created_at = Utc::now();
@@ -75,9 +76,9 @@ impl Url{
             .await
     }
     pub async fn read_from_url(pool: &SqlitePool, src: &str) -> Result<Self, sqlx::Error>{
+        info!("Url aread_from_url");
         let sql = "SELECT * FROM urls WHERE src = $1 LIMIT 1";
         debug!("Query: {}", sql);
-        debug!("src: {}", src);
         query(sql)
             .bind(src)
             .map(Self::from_row)
@@ -86,24 +87,24 @@ impl Url{
     }
 
     pub async fn update_or_create(pool: &SqlitePool, src: &str) -> Result<Self, sqlx::Error>{
+        info!("Url update_or_create");
         match Self::read_from_url(pool, src).await{
             Ok(url) => {
                 let url = Self::increase(pool, &url).await.unwrap();
-                println!("Exists: {:?}", &url);
                 Ok(url)
             },
             Err(e) => {
-                info!("Read or create: {}", e);
                 Self::create(pool, src).await
             }
         }
     }
 
-    pub async fn exists(pool: &SqlitePool, url_id: i64) -> bool{
-        let sql = "SELECT count(*) FROM urls WHERE url_id = $1";
+    pub async fn exists(pool: &SqlitePool, id: i64) -> bool{
+        info!("Url exists");
+        let sql = "SELECT count(*) FROM urls WHERE id = $1";
         debug!("Query: {}", sql);
         match query(sql)
-            .bind(url_id)
+            .bind(id)
             .map(|row: SqliteRow| -> i64 {row.get(0)})
             .fetch_one(pool)
             .await {
@@ -115,22 +116,22 @@ impl Url{
             }
     }
 
-    pub async fn read(pool: &SqlitePool, url_id: i64) -> Result<Self, sqlx::Error>{
-        let sql = "SELECT * FROM urls WHERE url_id = $1";
+    pub async fn read(pool: &SqlitePool, id: i64) -> Result<Self, sqlx::Error>{
+        info!("Url read");
+        let sql = "SELECT * FROM urls WHERE id = $1";
         debug!("Query: {}", sql);
         query(sql)
-            .bind(url_id)
+            .bind(id)
             .map(Self::from_row)
             .fetch_one(pool)
             .await
     }
 
     pub async fn increase(pool: &SqlitePool, url: &Self) -> Result<Self, sqlx::Error>{
+        info!("Url increase");
         let sql = "UPDATE urls SET num = $2, active = $3,
-                   created_at = $4, updated_at = $5 FROM urls
-                   WHERE url_id = $1
-                   RETURNING *";
-        debug!("Url to increase: {:?}", url);
+                   created_at = $4, updated_at = $5
+                   WHERE id = $1 RETURNING *";
         debug!("Query: {}", sql);
         query(sql)
             .bind(url.id)
@@ -142,10 +143,12 @@ impl Url{
             .fetch_one(pool)
             .await
     }
+
     pub async fn update(pool: &SqlitePool, url: Self) -> Result<Self, sqlx::Error>{
+        info!("update");
         let sql = "UPDATE urls SET num = $2, active = $3,
                    created_at = $4, updated_at = $5 FROM urls
-                   WHERE url_id = $1
+                   WHERE id = $1
                    RETURNING *";
         debug!("Query: {}", sql);
         query(sql)
@@ -159,12 +162,13 @@ impl Url{
             .await
     }
 
-    pub async fn delete(pool: &SqlitePool, url_id: i64) -> Result<Self, sqlx::Error>{
-        let sql = "DELETE from urls WHERE url_id = $1
+    pub async fn delete(pool: &SqlitePool, id: i64) -> Result<Self, sqlx::Error>{
+        info!("Url delete");
+        let sql = "DELETE from urls WHERE id = $1
                    RETURNING *";
         debug!("Query: {}", sql);
         query(sql)
-            .bind(url_id)
+            .bind(id)
             .map(Self::from_row)
             .fetch_one(pool)
             .await
@@ -228,21 +232,29 @@ mod url_test {
     }
 
     #[tokio::test]
-    async fn test_read_url(){
+    async fn test_create(){
+        // Start and prepare
+        let pool = setup().await;
+        // Test
+        let src = "https://atareao.es";
+        let url = Url::create(&pool, src).await.unwrap();
+        assert!(url.get_src() == src);
+        assert!(url.get_num() == 0);
+        // End and Clean
+        teardown().await;
+    }
+    #[tokio::test]
+    async fn test_increase(){
         // Start and prepare
         let pool = setup().await;
         // Test
         let src = "https://atareao.es";
         let url = Url::create(&pool, src).await.unwrap();
         debug!("Url created: {:?}", url);
-        match Url::update_or_create(&pool, src).await{
-            Ok(url) => println!("Url: {:?}", url),
-            Err(e) => {
-                println!("Porque no encuentra nada");
-                println!("Error: {}", e);
-            },
-
-        };
+        let new_url = Url::increase(&pool, &url).await.unwrap();
+        debug!("Url updated: {:?}", new_url);
+        assert!(new_url.get_src() == src);
+        assert!(new_url.get_num() == 1);
         // End and Clean
         teardown().await;
     }
