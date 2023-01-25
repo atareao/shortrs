@@ -3,45 +3,115 @@
 {% block head %}
     {{ super() }}
     <style type="text/css">
-        .important { color: #336699; }
+        .container { max-width: 600px;}
+        #copy-status{
+            text-align: end;
+            font-size: 14px;
+        }
+        #src{
+            text-align: center;
+        }
+        #url {
+            text-align: center;
+            background-image: url("data:image/svg+xml, %3Csvg%20class%3D%22svg-icon%22%20style%3D%22overflow%3Ahidden%3Bfill%3AcurrentColor%22%20viewBox%3D%220%200%2024%2024%22%20version%3D%221.1%22%20width%3D%2224%22%20height%3D%2224%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M%2019.5%2C2.4%20H%2017.73%20A%204.5%2C3.6%200%200%200%2013.5%2C0%20h%20-3%20A%204.5%2C3.6%200%200%200%206.27%2C2.4%20H%204.5%20A%204.5%2C3.6%200%200%200%200%2C6%20V%2020.4%20A%204.5%2C3.6%200%200%200%204.5%2C24%20h%2015%20A%204.5%2C3.6%200%200%200%2024%2C20.4%20V%206%20A%204.5%2C3.6%200%200%200%2019.5%2C2.4%20Z%20M%209%2C3.6%20a%201.5%2C1.2%200%200%201%201.5%2C-1.2%20h%203%20A%201.5%2C1.2%200%200%201%2015%2C3.6%20V%204.8%20H%209%20Z%20m%2012%2C16.8%20a%201.5%2C1.2%200%200%201%20-1.5%2C1.2%20H%204.5%20A%201.5%2C1.2%200%200%201%203%2C20.4%20V%206%20A%201.5%2C1.2%200%200%201%204.5%2C4.8%20H%206%20V%206%20a%201.5%2C1.2%200%200%200%201.5%2C1.2%20h%209%20A%201.5%2C1.2%200%200%200%2018%2C6%20V%204.8%20h%201.5%20A%201.5%2C1.2%200%200%201%2021%2C6%20Z%22%20style%3D%22fill%3A%231ab3ef%3Bfill-opacity%3A1%3Bstroke%3Anone%3Bstroke-width%3A0.031305%3Bstroke-dasharray%3Anone%3Bstroke-opacity%3A1%22%2F%3E%3C%2Fsvg%3E");
+            background-position-x: calc(100% - 14px);
+            background-position-y: 50%;
+        }
     </style>
 {% endblock head %}
 {% block content %}
-        <input id="src" type="text" placeholder="Enter your link"/>
-        <button id="submit">Shortme</button>
-    </form>
-    <div>
-        <h3 id="error"></h3>
+    <input id="src" type="text" placeholder="Enter your link"/>
+    <button id="submit">Shortme</button>
+    <div id = "error">
     </div>
     <div id="result" style="display: none;">
-        <a id="url" href=""></a><span id="clip">📋</span>
-        <span id="copy-status">Click to copy</span>
+        <input id="url" type="text" value="" readonly>
+        <div id="copy-status">Click to copy</div>
     </div>
 <script>
-function validURL(str) {
+    function checkWeb(src){
+        document.body.style.cursor = "wait";
+        button.style.cursor = "wait";
+        fetch("/_ping", {
+            method: "post",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({src: src}),
+        })
+        .then((response) => response.json())
+        .then((result) => {
+            console.log("Comol");
+            console.log("Success", JSON.stringify(result));
+            if(result.status == 200){
+                input.setAttribute("aria-invalid", "false");
+                create(src);
+                error.innerHTML = "";
+                error.style.display = "none";
+                button.style.cursor = "pointer";
+            }else{
+                result_div.style.display = "none";
+                error.style.display = "block";
+                button.style.cursor = "pointer";
+                error.innerHTML = `<p>This url '${src}' is not valid url</p><p>${result.message}</p>`;
+                input.setAttribute("aria-invalid", "true");
+            }
+            document.body.style.cursor = "default";
+        })
+        .catch((error) => {
+            console.log("Error comol");
+            console.log("Error", JSON.stringify(error));
+            result_div.style.display = "none";
+            document.body.style.cursor = "default";
+        });
+        return false;
+    }
+function validURL(src) {
   const pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
     '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
     '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
     '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
     '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
     '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
-  return !!pattern.test(str);
+  return !!pattern.test(src);
+}
+function create(src){
+    fetch("/", {
+        method: "post",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({src: src}),
+    })
+    .then((response) => response.json())
+    .then((result) => {
+        console.log("Success", result);
+        url.value = window.location.href + result.short;
+        result_div.style.display = "block";
+    })
+    .catch((error) => {
+        console.log("Error", error);
+        result_div.style.display = "none";
+    });
+    return false;
 }
 const input = document.getElementById("src");
 const result_div = document.getElementById("result");
 const button = document.getElementById('submit');
 const url = document.getElementById("url");
 const clip = document.getElementById("clip");
+const error = document.getElementById("error");
 input.addEventListener('input', function (evt) {
+    result_div.style.display = "none";
     input.setAttribute("aria-invalid", !validURL(input.value));
 });
-clip.addEventListener("click", function(event){
+url.addEventListener("click", function(event){
     if (!navigator.clipboard) {
         // Clipboard API not available
         return;
     }
     try {
-        navigator.clipboard.writeText(url.innerText);
+        navigator.clipboard.writeText(url.value);
         document.getElementById('copy-status').innerText = 'Copied to clipboard';
         setTimeout(function () {
             document.getElementById('copy-status').innerText = 'Click to copy';
@@ -54,35 +124,16 @@ false);
 button.onclick = function(event){
     const src = input.value;
     const messageError = document.getElementById("error");
+    input.setAttribute("aria-invalid", "none");
     if(!validURL(src)){
         console.log("Url not valid");
         input.setAttribute("aria-invalid", "true");
-        url.innerHTML = `This url '${src}' is not valid url`;
+        error.innerHTML = `This url '${src}' is not valid url`;
         return;
     }else{
-        input.setAttribute("aria-invalid", "false");
+        let status = checkWeb(src);
     }
     //open the request
-    fetch("/", {
-        method: "post",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({src: src}),
-    })
-    .then((response) => response.json())
-    .then((result) => {
-        console.log("Success", result);
-        const ref = window.location.href + result.short;
-        url.href = `/${result.short}`;
-        url.innerText = ref;
-        result_div.style.display = "block";
-    })
-    .catch((error) => {
-        console.log("Error", error);
-        result_div.style.display = "none";
-    });
-    return false;
 }
 </script>
 {% endblock content %}
