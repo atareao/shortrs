@@ -34,26 +34,10 @@ impl Url{
             num: self.num,
         }
     }
-    pub fn get_id(&self) -> i64{
-        self.id
-    }
     pub fn get_num(&self) -> u32{
         self.num
     }
 
-    pub fn new(src: String) -> Self{
-        let active = true;
-        let created_at = Utc::now();
-        let updated_at = created_at.clone();
-        Self{
-            id: 0,
-            src,
-            num: 0,
-            active,
-            created_at,
-            updated_at,
-        }
-    }
     pub fn get_url(&self) -> String{
         let value: u32 = self.id.try_into().unwrap();
         to_d36(value)
@@ -137,6 +121,16 @@ impl Url{
             .bind(id)
             .map(Self::from_row)
             .fetch_one(pool)
+            .await
+    }
+
+    pub async fn read_all(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error>{
+        info!("Url read");
+        let sql = "SELECT * FROM urls";
+        debug!("Query: {}", sql);
+        query(sql)
+            .map(Self::from_row)
+            .fetch_all(pool)
             .await
     }
 
