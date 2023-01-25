@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     Router,
     Extension,
@@ -12,8 +14,8 @@ use axum::{
 };
 use tracing::{info, debug, error};
 use tera::{Tera, Context};
-use serde::Deserialize;
-use crate::model::{url::Url, radix::from_d36};
+use serde::{Serialize, Deserialize};
+use crate::model::{url::{Url, ShortUrl}, radix::from_d36};
 
 use super::ApiContext;
 
@@ -29,6 +31,12 @@ pub fn router() -> Router{
     .route("/",
         post(post_shorturl)
     )
+    .route("/_stats",
+        get(get_stats)
+    )
+    .route("/_ping",
+        post(do_ping)
+    )
     .route("/:path",
         get(redirect)
     )
@@ -37,6 +45,13 @@ pub fn router() -> Router{
 #[derive(Deserialize)]
 struct NewUrl{
     src: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct UrlResponse{
+    src: String,
+    status: u16,
+    message: String,
 }
 
 
@@ -52,12 +67,54 @@ async fn post_shorturl(
 async fn get_shorturl(
     t: Extension<Tera>
 ) -> impl IntoResponse{
-    let mut context = Context::new();
-    let message = "Message";
-    context.insert("response", &message);
+    let context = Context::new();
     Html(t.render("index.html", &context).unwrap()).into_response()
 }
 
+async fn get_stats(
+    ctx: Extension<ApiContext>,
+    t: Extension<Tera>
+) -> impl IntoResponse{
+    let mut context = Context::new();
+    let urls: Vec<ShortUrl> =  Url::read_all(&ctx.pool).await
+        .unwrap()
+        .iter()
+        .map(|item| item.get_short())
+        .collect();
+    context.insert("urls", &urls);
+    Html(t.render("stats.html", &context).unwrap()).into_response()
+}
+
+async fn do_ping(
+    Json(payload): Json<NewUrl>
+) -> impl IntoResponse{
+    let src = payload.src;
+    info!("Do ping from {}", &src);
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
+    match client.get(&src)
+        .send()
+        .await{
+            Ok(response) => {
+                debug!("Response: {:?}", response);
+                Json(UrlResponse{
+                    src: src.clone(),
+                    status: response.status().as_u16(),
+                    message: "No se".to_string(),
+                })
+            },
+            Err(e) => {
+                debug!("Error: {:?}", e);
+                Json(UrlResponse{
+                    src: src.clone(),
+                    status: 500,
+                    message: e.to_string(),
+                })
+            }
+        }
+}
 async fn redirect(
     ctx: Extension<ApiContext>,
     t: Extension<Tera>,
