@@ -25,12 +25,11 @@ RUN rustup target add $TARGET && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
 COPY Cargo.toml Cargo.lock ./
 COPY src src
 
 RUN cargo build --release --target $TARGET && \
-    cp /app/target/$TARGET/release/shorts /app/shorts
+    cp /app/target/$TARGET/release/shortrs /app/shortrs
 
 ###############################################################################
 ## Final image
@@ -50,7 +49,7 @@ COPY entrypoint.sh /app/
 COPY migrations /app/migrations
 COPY templates /app/templates
 # Copy our build
-COPY --from=builder /app/shorts /app/
+COPY --from=builder /app/shortrs /app/
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
 CMD ["/app/shorts"]
